@@ -5,17 +5,29 @@ import jadx.core.dex.instructions.InsnType;
 import jadx.core.dex.instructions.args.ArgType;
 import jadx.core.dex.instructions.args.InsnArg;
 import jadx.core.dex.instructions.args.InsnWrapArg;
+import jadx.core.dex.instructions.args.LiteralArg;
+import jadx.core.dex.instructions.args.NamedArg;
 import jadx.core.dex.instructions.args.RegisterArg;
+import jadx.core.dex.instructions.args.SSAVar;
 import jadx.core.utils.InsnUtils;
 import jadx.core.utils.Utils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
 import com.android.dx.io.instructions.DecodedInstruction;
+import com.rits.cloning.Cloner;
 
 public class InsnNode extends LineAttrNode {
+
+	private static final Cloner INSN_CLONER = new Cloner();
+
+	static {
+		INSN_CLONER.dontClone(ArgType.class, SSAVar.class, LiteralArg.class, NamedArg.class);
+		INSN_CLONER.dontCloneInstanceOf(RegisterArg.class);
+	}
 
 	protected final InsnType insnType;
 
@@ -146,12 +158,12 @@ public class InsnNode extends LineAttrNode {
 		this.offset = offset;
 	}
 
-	public void getRegisterArgs(List<RegisterArg> list) {
+	public void getRegisterArgs(Collection<RegisterArg> collection) {
 		for (InsnArg arg : this.getArguments()) {
 			if (arg.isRegister()) {
-				list.add((RegisterArg) arg);
+				collection.add((RegisterArg) arg);
 			} else if (arg.isInsnWrap()) {
-				((InsnWrapArg) arg).getWrapInsn().getRegisterArgs(list);
+				((InsnWrapArg) arg).getWrapInsn().getRegisterArgs(collection);
 			}
 		}
 	}
@@ -193,6 +205,21 @@ public class InsnNode extends LineAttrNode {
 		}
 	}
 
+	public boolean canReorderRecursive() {
+		if (!canReorder()) {
+			return false;
+		}
+		for (InsnArg arg : this.getArguments()) {
+			if (arg.isInsnWrap()) {
+				InsnNode wrapInsn = ((InsnWrapArg) arg).getWrapInsn();
+				if (!wrapInsn.canReorderRecursive()) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
 	@Override
 	public String toString() {
 		return InsnUtils.formatOffset(offset) + ": "
@@ -224,8 +251,54 @@ public class InsnNode extends LineAttrNode {
 		if (this == other) {
 			return true;
 		}
-		return insnType == other.insnType
-				&& arguments.size() == other.arguments.size();
+		if (insnType != other.insnType
+				|| arguments.size() != other.arguments.size()) {
+			return false;
+		}
+		// check wrapped instructions
+		int size = arguments.size();
+		for (int i = 0; i < size; i++) {
+			InsnArg arg = arguments.get(i);
+			InsnArg otherArg = other.arguments.get(i);
+			if (arg.isInsnWrap()) {
+				if (!otherArg.isInsnWrap()) {
+					return false;
+				}
+				InsnNode wrapInsn = ((InsnWrapArg) arg).getWrapInsn();
+				InsnNode otherWrapInsn = ((InsnWrapArg) otherArg).getWrapInsn();
+				if (!wrapInsn.isSame(otherWrapInsn)) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
+	protected <T extends InsnNode> T copyCommonParams(T copy) {
+		copy.setResult(result);
+		if (copy.getArgsCount() == 0) {
+			for (InsnArg arg : this.getArguments()) {
+				if (arg.isInsnWrap()) {
+					InsnNode wrapInsn = ((InsnWrapArg) arg).getWrapInsn();
+					copy.addArg(InsnArg.wrapArg(wrapInsn.copy()));
+				} else {
+					copy.addArg(arg);
+				}
+			}
+		}
+		copy.copyAttributesFrom(this);
+		copy.copyLines(this);
+		copy.setOffset(this.getOffset());
+		return copy;
+	}
+
+	/**
+	 * Make copy of InsnNode object.
+	 */
+	public InsnNode copy() {
+		if (this.getClass() == InsnNode.class) {
+			return copyCommonParams(new InsnNode(insnType, getArgsCount()));
+		}
+		return INSN_CLONER.deepClone(this);
+	}
 }

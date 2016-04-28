@@ -12,6 +12,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.SwingConstants;
@@ -24,7 +25,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -53,13 +53,22 @@ public class JadxSettingsWindow extends JDialog {
 		this.startSettings = JadxSettingsAdapter.makeString(settings);
 
 		initUI();
+
+		setTitle(NLS.str("preferences.title"));
+		setSize(400, 550);
+		setLocationRelativeTo(null);
+		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+		setModalityType(ModalityType.APPLICATION_MODAL);
+		pack();
 	}
 
 	private void initUI() {
 		JPanel panel = new JPanel();
-		panel.setLayout(new GridLayout(0, 1, 10, 5));
+		panel.setLayout(new BoxLayout(panel, BoxLayout.PAGE_AXIS));
 		panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		panel.add(makeDeobfuscationGroup());
+		panel.add(makeDecompilationGroup());
+		panel.add(makeEditorGroup());
 		panel.add(makeOtherGroup());
 
 		JButton saveBtn = new JButton(NLS.str("preferences.save"));
@@ -80,9 +89,29 @@ public class JadxSettingsWindow extends JDialog {
 			}
 		});
 
+		JButton resetBtn = new JButton(NLS.str("preferences.reset"));
+		resetBtn.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent event) {
+				int res = JOptionPane.showConfirmDialog(
+						JadxSettingsWindow.this,
+						NLS.str("preferences.reset_message"),
+						NLS.str("preferences.reset_title"),
+						JOptionPane.YES_NO_OPTION);
+				if (res == JOptionPane.YES_OPTION) {
+					String defaults = JadxSettingsAdapter.makeString(new JadxSettings());
+					JadxSettingsAdapter.fill(settings, defaults);
+					getContentPane().removeAll();
+					initUI();
+					pack();
+					repaint();
+				}
+			}
+		});
+
 		JPanel buttonPane = new JPanel();
 		buttonPane.setLayout(new BoxLayout(buttonPane, BoxLayout.LINE_AXIS));
 		buttonPane.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+		buttonPane.add(resetBtn);
 		buttonPane.add(Box.createHorizontalGlue());
 		buttonPane.add(saveBtn);
 		buttonPane.add(Box.createRigidArea(new Dimension(10, 0)));
@@ -92,17 +121,9 @@ public class JadxSettingsWindow extends JDialog {
 		contentPane.add(panel, BorderLayout.CENTER);
 		contentPane.add(buttonPane, BorderLayout.PAGE_END);
 		getRootPane().setDefaultButton(saveBtn);
-
-		setTitle(NLS.str("preferences.title"));
-		setSize(400, 550);
-		setLocationRelativeTo(null);
-		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-		setModalityType(ModalityType.APPLICATION_MODAL);
-		pack();
 	}
 
 	private SettingsGroup makeDeobfuscationGroup() {
-
 		JCheckBox deobfOn = new JCheckBox();
 		deobfOn.setSelected(settings.isDeobfuscationOn());
 		deobfOn.addItemListener(new ItemListener() {
@@ -160,15 +181,29 @@ public class JadxSettingsWindow extends JDialog {
 		return deobfGroup;
 	}
 
-	private SettingsGroup makeOtherGroup() {
-		JCheckBox update = new JCheckBox();
-		update.setSelected(settings.isCheckForUpdates());
-		update.addItemListener(new ItemListener() {
-			public void itemStateChanged(ItemEvent e) {
-				settings.setCheckForUpdates(e.getStateChange() == ItemEvent.SELECTED);
+	private SettingsGroup makeEditorGroup() {
+		JButton fontBtn = new JButton(NLS.str("preferences.select_font"));
+		fontBtn.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				JFontChooser fontChooser = new JFontChooser();
+				fontChooser.setSelectedFont(settings.getFont());
+				int result = fontChooser.showDialog(JadxSettingsWindow.this);
+				if (result == JFontChooser.OK_OPTION) {
+					Font font = fontChooser.getSelectedFont();
+					LOG.info("Selected Font : {}", font);
+					settings.setFont(font);
+					mainWindow.updateFont(font);
+				}
 			}
 		});
 
+		SettingsGroup other = new SettingsGroup(NLS.str("preferences.editor"));
+		other.addRow(NLS.str("preferences.font"), fontBtn);
+		return other;
+	}
+
+	private SettingsGroup makeDecompilationGroup() {
 		JCheckBox fallback = new JCheckBox();
 		fallback.setSelected(settings.isFallbackMode());
 		fallback.addItemListener(new ItemListener() {
@@ -205,6 +240,52 @@ public class JadxSettingsWindow extends JDialog {
 			}
 		});
 
+		JCheckBox autoStartJobs = new JCheckBox();
+		autoStartJobs.setSelected(settings.isAutoStartJobs());
+		autoStartJobs.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				settings.setAutoStartJobs(e.getStateChange() == ItemEvent.SELECTED);
+			}
+		});
+
+		JCheckBox escapeUnicode = new JCheckBox();
+		escapeUnicode.setSelected(settings.escapeUnicode());
+		escapeUnicode.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				settings.setEscapeUnicode(e.getStateChange() == ItemEvent.SELECTED);
+				needReload();
+			}
+		});
+
+		JCheckBox replaceConsts = new JCheckBox();
+		replaceConsts.setSelected(settings.isReplaceConsts());
+		replaceConsts.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				settings.setReplaceConsts(e.getStateChange() == ItemEvent.SELECTED);
+				needReload();
+			}
+		});
+
+		SettingsGroup other = new SettingsGroup(NLS.str("preferences.decompile"));
+		other.addRow(NLS.str("preferences.threads"), threadsCount);
+		other.addRow(NLS.str("preferences.start_jobs"), autoStartJobs);
+		other.addRow(NLS.str("preferences.showInconsistentCode"), showInconsistentCode);
+		other.addRow(NLS.str("preferences.escapeUnicode"), escapeUnicode);
+		other.addRow(NLS.str("preferences.replaceConsts"), replaceConsts);
+		other.addRow(NLS.str("preferences.fallback"), fallback);
+		other.addRow(NLS.str("preferences.skipResourcesDecode"), resourceDecode);
+		return other;
+	}
+
+	private SettingsGroup makeOtherGroup() {
+		JCheckBox update = new JCheckBox();
+		update.setSelected(settings.isCheckForUpdates());
+		update.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				settings.setCheckForUpdates(e.getStateChange() == ItemEvent.SELECTED);
+			}
+		});
+
 		JCheckBox cfg = new JCheckBox();
 		cfg.setSelected(settings.isCFGOutput());
 		cfg.addItemListener(new ItemListener() {
@@ -223,31 +304,10 @@ public class JadxSettingsWindow extends JDialog {
 			}
 		});
 
-		JButton fontBtn = new JButton(NLS.str("preferences.select_font"));
-		fontBtn.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				JFontChooser fontChooser = new JFontChooser();
-				fontChooser.setSelectedFont(settings.getFont());
-				int result = fontChooser.showDialog(JadxSettingsWindow.this);
-				if (result == JFontChooser.OK_OPTION) {
-					Font font = fontChooser.getSelectedFont();
-					LOG.info("Selected Font : {}", font);
-					settings.setFont(font);
-					mainWindow.updateFont(font);
-				}
-			}
-		});
-
 		SettingsGroup other = new SettingsGroup(NLS.str("preferences.other"));
 		other.addRow(NLS.str("preferences.check_for_updates"), update);
-		other.addRow(NLS.str("preferences.threads"), threadsCount);
-		other.addRow(NLS.str("preferences.fallback"), fallback);
-		other.addRow(NLS.str("preferences.showInconsistentCode"), showInconsistentCode);
-		other.addRow(NLS.str("preferences.skipResourcesDecode"), resourceDecode);
 		other.addRow(NLS.str("preferences.cfg"), cfg);
 		other.addRow(NLS.str("preferences.raw_cfg"), rawCfg);
-		other.addRow(NLS.str("preferences.font"), fontBtn);
 		return other;
 	}
 

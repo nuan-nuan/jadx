@@ -3,6 +3,7 @@ package jadx.core.dex.attributes;
 import jadx.core.dex.attributes.annotations.AnnotationsList;
 import jadx.core.dex.attributes.annotations.MethodParameters;
 import jadx.core.dex.attributes.nodes.DeclareVariablesAttr;
+import jadx.core.dex.attributes.nodes.EdgeInsnAttr;
 import jadx.core.dex.attributes.nodes.EnumClassAttr;
 import jadx.core.dex.attributes.nodes.EnumMapAttr;
 import jadx.core.dex.attributes.nodes.FieldReplaceAttr;
@@ -15,7 +16,7 @@ import jadx.core.dex.attributes.nodes.LoopLabelAttr;
 import jadx.core.dex.attributes.nodes.MethodInlineAttr;
 import jadx.core.dex.attributes.nodes.PhiListAttr;
 import jadx.core.dex.attributes.nodes.SourceFileAttr;
-import jadx.core.dex.nodes.parser.FieldValueAttr;
+import jadx.core.dex.nodes.parser.FieldInitAttr;
 import jadx.core.dex.trycatch.CatchAttr;
 import jadx.core.dex.trycatch.ExcHandlerAttr;
 import jadx.core.dex.trycatch.SplitterBlockAttr;
@@ -30,12 +31,13 @@ public class AType<T extends IAttribute> {
 
 	public static final AType<AttrList<JumpInfo>> JUMP = new AType<AttrList<JumpInfo>>();
 	public static final AType<AttrList<LoopInfo>> LOOP = new AType<AttrList<LoopInfo>>();
+	public static final AType<AttrList<EdgeInsnAttr>> EDGE_INSN = new AType<AttrList<EdgeInsnAttr>>();
 
 	public static final AType<ExcHandlerAttr> EXC_HANDLER = new AType<ExcHandlerAttr>();
 	public static final AType<CatchAttr> CATCH_BLOCK = new AType<CatchAttr>();
 	public static final AType<SplitterBlockAttr> SPLITTER_BLOCK = new AType<SplitterBlockAttr>();
 	public static final AType<ForceReturnAttr> FORCE_RETURN = new AType<ForceReturnAttr>();
-	public static final AType<FieldValueAttr> FIELD_VALUE = new AType<FieldValueAttr>();
+	public static final AType<FieldInitAttr> FIELD_INIT = new AType<FieldInitAttr>();
 	public static final AType<FieldReplaceAttr> FIELD_REPLACE = new AType<FieldReplaceAttr>();
 	public static final AType<JadxErrorAttr> JADX_ERROR = new AType<JadxErrorAttr>();
 	public static final AType<MethodInlineAttr> METHOD_INLINE = new AType<MethodInlineAttr>();

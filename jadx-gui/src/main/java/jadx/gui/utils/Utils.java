@@ -36,7 +36,9 @@ public class Utils {
 	}
 
 	public static String typeFormat(String name, ArgType type) {
-		return "<html>" + name + "<span style='color:#888888;'> : " + typeStr(type) + "</span></html>";
+		return "<html><body><nobr>" + name
+				+ "<span style='color:#888888;'> : " + typeStr(type) + "</span>"
+				+ "</nobr></body></html>";
 	}
 
 	public static String typeStr(ArgType type) {
@@ -83,5 +85,32 @@ public class Utils {
 			overIcon.add(ICON_NATIVE);
 		}
 		return overIcon;
+	}
+
+	public static boolean isFreeMemoryAvailable() {
+		Runtime runtime = Runtime.getRuntime();
+		long maxMemory = runtime.maxMemory();
+		long totalFree = runtime.freeMemory() + maxMemory - runtime.totalMemory();
+		return totalFree > maxMemory * 0.2;
+	}
+
+	public static String memoryInfo() {
+		Runtime runtime = Runtime.getRuntime();
+		StringBuilder sb = new StringBuilder();
+		long maxMemory = runtime.maxMemory();
+		long allocatedMemory = runtime.totalMemory();
+		long freeMemory = runtime.freeMemory();
+
+		sb.append("heap: ").append(format(allocatedMemory - freeMemory));
+		sb.append(", allocated: ").append(format(allocatedMemory));
+		sb.append(", free: ").append(format(freeMemory));
+		sb.append(", total free: ").append(format(freeMemory + maxMemory - allocatedMemory));
+		sb.append(", max: ").append(format(maxMemory));
+
+		return sb.toString();
+	}
+
+	private static String format(long mem) {
+		return Long.toString((long) (mem / 1024. / 1024.)) + "MB";
 	}
 }

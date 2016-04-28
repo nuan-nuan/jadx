@@ -36,7 +36,11 @@ public class DebugUtils {
 	private static final Logger LOG = LoggerFactory.getLogger(DebugUtils.class);
 
 	public static void dump(MethodNode mth) {
-		File out = new File("test-graph-tmp");
+		dump(mth, "");
+	}
+
+	public static void dump(MethodNode mth, String desc) {
+		File out = new File("test-graph" + desc + "-tmp");
 		DotGraphVisitor.dump(out).visit(mth);
 		DotGraphVisitor.dumpRaw(out).visit(mth);
 		DotGraphVisitor.dumpRegions(out).visit(mth);
@@ -64,7 +68,7 @@ public class DebugUtils {
 	}
 
 	public static void printRegions(MethodNode mth, boolean printInsns) {
-		LOG.debug("|{}", mth.toString());
+		LOG.debug("|{}", mth);
 		printRegion(mth, mth.getRegion(), "|  ", printInsns);
 	}
 
@@ -75,7 +79,7 @@ public class DebugUtils {
 			if (container instanceof IRegion) {
 				printRegion(mth, (IRegion) container, indent, printInsns);
 			} else {
-				LOG.debug("{}{}", indent, container);
+				LOG.debug("{}{} {}", indent, container, container.getAttributesString());
 				if (printInsns && container instanceof IBlock) {
 					IBlock block = (IBlock) container;
 					printInsns(mth, indent, block);

@@ -8,6 +8,7 @@ import jadx.core.dex.visitors.DebugInfoVisitor;
 import jadx.core.dex.visitors.DependencyCollector;
 import jadx.core.dex.visitors.DotGraphVisitor;
 import jadx.core.dex.visitors.EnumVisitor;
+import jadx.core.dex.visitors.ExtractFieldInit;
 import jadx.core.dex.visitors.FallbackModeVisitor;
 import jadx.core.dex.visitors.IDexTreeVisitor;
 import jadx.core.dex.visitors.MethodInlineVisitor;
@@ -31,7 +32,6 @@ import jadx.core.dex.visitors.ssa.EliminatePhiNodes;
 import jadx.core.dex.visitors.ssa.SSATransform;
 import jadx.core.dex.visitors.typeinference.FinishTypeInference;
 import jadx.core.dex.visitors.typeinference.TypeInference;
-import jadx.core.utils.Utils;
 
 import java.io.File;
 import java.net.URL;
@@ -49,9 +49,6 @@ public class Jadx {
 	static {
 		if (Consts.DEBUG) {
 			LOG.info("debug enabled");
-		}
-		if (Jadx.class.desiredAssertionStatus()) {
-			LOG.info("assertions enabled");
 		}
 	}
 
@@ -100,6 +97,7 @@ public class Jadx {
 			}
 
 			passes.add(new MethodInlineVisitor());
+			passes.add(new ExtractFieldInit());
 			passes.add(new ClassModifier());
 			passes.add(new EnumVisitor());
 			passes.add(new PrepareForCodeGen());
@@ -115,7 +113,7 @@ public class Jadx {
 
 	public static String getVersion() {
 		try {
-			ClassLoader classLoader = Utils.class.getClassLoader();
+			ClassLoader classLoader = Jadx.class.getClassLoader();
 			if (classLoader != null) {
 				Enumeration<URL> resources = classLoader.getResources("META-INF/MANIFEST.MF");
 				while (resources.hasMoreElements()) {

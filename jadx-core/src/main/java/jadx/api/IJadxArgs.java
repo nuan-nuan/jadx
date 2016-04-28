@@ -30,4 +30,16 @@ public interface IJadxArgs {
 	boolean isDeobfuscationForceSave();
 
 	boolean useSourceNameAsClassAlias();
+
+	boolean escapeUnicode();
+
+	/**
+	 * Replace constant values with static final fields with same value
+	 */
+	boolean isReplaceConsts();
+
+	/**
+	 * Save as gradle project
+	 */
+	boolean isExportAsGradleProject();
 }

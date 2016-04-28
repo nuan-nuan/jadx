@@ -1,10 +1,10 @@
 package jadx.api;
 
 public enum ResourceType {
-	CODE(".dex", ".class"),
+	CODE(".dex", ".jar", ".class"),
 	MANIFEST("AndroidManifest.xml"),
-	XML(".xml"), // TODO binary or not?
-	ARSC(".arsc"), // TODO decompile !!!
+	XML(".xml"),
+	ARSC(".arsc"),
 	FONT(".ttf"),
 	IMG(".png", ".gif", ".jpg"),
 	LIB(".so"),
@@ -34,15 +34,15 @@ public enum ResourceType {
 	public static boolean isSupportedForUnpack(ResourceType type) {
 		switch (type) {
 			case CODE:
-			case ARSC:
 			case LIB:
 			case FONT:
-			case IMG:
 			case UNKNOWN:
 				return false;
 
 			case MANIFEST:
 			case XML:
+			case ARSC:
+			case IMG:
 				return true;
 		}
 		return false;

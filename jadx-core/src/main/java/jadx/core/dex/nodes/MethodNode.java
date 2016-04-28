@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +44,7 @@ import com.android.dex.Code;
 import com.android.dex.Code.CatchHandler;
 import com.android.dex.Code.Try;
 
-public class MethodNode extends LineAttrNode implements ILoadable {
+public class MethodNode extends LineAttrNode implements ILoadable, IDexNode {
 	private static final Logger LOG = LoggerFactory.getLogger(MethodNode.class);
 
 	private final MethodInfo mthInfo;
@@ -442,6 +443,7 @@ public class MethodNode extends LineAttrNode implements ILoadable {
 		loops.add(loop);
 	}
 
+	@Nullable
 	public LoopInfo getLoopForBlock(BlockNode block) {
 		if (loops.isEmpty()) {
 			return null;
@@ -511,11 +513,11 @@ public class MethodNode extends LineAttrNode implements ILoadable {
 		}
 
 		String name = getName();
-		List<MethodNode> methods = parentClass.getMethods();
-		for (MethodNode method : methods) {
+		for (MethodNode method : parentClass.getMethods()) {
+			MethodInfo otherMthInfo = method.mthInfo;
 			if (this != method
-					&& method.getName().equals(name)
-					&& method.mthInfo.getArgumentsTypes().size() == argsCount) {
+					&& otherMthInfo.getArgumentsTypes().size() == argsCount
+					&& otherMthInfo.getName().equals(name)) {
 				return true;
 			}
 		}
@@ -552,14 +554,24 @@ public class MethodNode extends LineAttrNode implements ILoadable {
 		return debugInfoOffset;
 	}
 
-	public SSAVar makeNewSVar(int regNum, int[] versions, @NotNull RegisterArg arg) {
-		SSAVar var = new SSAVar(regNum, versions[regNum], arg);
-		versions[regNum]++;
+	public SSAVar makeNewSVar(int regNum, int version, @NotNull RegisterArg assignArg) {
+		SSAVar var = new SSAVar(regNum, version, assignArg);
 		if (sVars.isEmpty()) {
 			sVars = new ArrayList<SSAVar>();
 		}
 		sVars.add(var);
 		return var;
+	}
+
+	public int getNextSVarVersion(int regNum) {
+		int v = -1;
+		for (SSAVar sVar : sVars) {
+			if (sVar.getRegNum() == regNum) {
+				v = Math.max(v, sVar.getVersion());
+			}
+		}
+		v++;
+		return v;
 	}
 
 	public void removeSVar(SSAVar var) {
@@ -582,8 +594,14 @@ public class MethodNode extends LineAttrNode implements ILoadable {
 		this.region = region;
 	}
 
+	@Override
 	public DexNode dex() {
 		return parentClass.dex();
+	}
+
+	@Override
+	public RootNode root() {
+		return dex().root();
 	}
 
 	public MethodInfo getMethodInfo() {

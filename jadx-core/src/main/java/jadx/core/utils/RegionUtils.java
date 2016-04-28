@@ -46,7 +46,7 @@ public class RegionUtils {
 			List<IContainer> blocks = region.getSubBlocks();
 			return !blocks.isEmpty() && hasExitEdge(blocks.get(blocks.size() - 1));
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -68,7 +68,23 @@ public class RegionUtils {
 			}
 			return getLastInsn(blocks.get(blocks.size() - 1));
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
+		}
+	}
+
+	public static IBlock getLastBlock(IContainer container) {
+		if (container instanceof IBlock) {
+			return (IBlock) container;
+		} else if (container instanceof IBranchRegion) {
+			return null;
+		} else if (container instanceof IRegion) {
+			List<IContainer> blocks = ((IRegion) container).getSubBlocks();
+			if (blocks.isEmpty()) {
+				return null;
+			}
+			return getLastBlock(blocks.get(blocks.size() - 1));
+		} else {
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -85,7 +101,7 @@ public class RegionUtils {
 			return !blocks.isEmpty()
 					&& hasExitBlock(blocks.get(blocks.size() - 1));
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -112,7 +128,7 @@ public class RegionUtils {
 			}
 			return count;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -132,7 +148,7 @@ public class RegionUtils {
 			}
 			return false;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -145,7 +161,7 @@ public class RegionUtils {
 				getAllRegionBlocks(block, blocks);
 			}
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -161,7 +177,7 @@ public class RegionUtils {
 			}
 			return false;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -245,7 +261,7 @@ public class RegionUtils {
 			}
 			return null;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + container.getClass());
+			throw new JadxRuntimeException(unknownContainerType(container));
 		}
 	}
 
@@ -267,7 +283,7 @@ public class RegionUtils {
 			}
 			return true;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + cont.getClass());
+			throw new JadxRuntimeException(unknownContainerType(cont));
 		}
 	}
 
@@ -288,8 +304,14 @@ public class RegionUtils {
 			}
 			return true;
 		} else {
-			throw new JadxRuntimeException("Unknown container type: " + cont.getClass());
+			throw new JadxRuntimeException(unknownContainerType(cont));
 		}
 	}
 
+	protected static String unknownContainerType(IContainer container) {
+		if (container == null) {
+			return "Null container variable";
+		}
+		return "Unknown container type: " + container.getClass();
+	}
 }

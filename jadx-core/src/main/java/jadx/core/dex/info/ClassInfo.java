@@ -125,6 +125,10 @@ public final class ClassInfo {
 		return pkg;
 	}
 
+	public boolean isDefaultPackage() {
+		return pkg.isEmpty();
+	}
+
 	public String getRawName() {
 		return type.getObject();
 	}
@@ -167,7 +171,7 @@ public final class ClassInfo {
 
 	@Override
 	public int hashCode() {
-		return fullName.hashCode();
+		return type.hashCode();
 	}
 
 	@Override

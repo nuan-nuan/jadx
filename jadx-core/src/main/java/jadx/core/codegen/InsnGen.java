@@ -36,23 +36,23 @@ import jadx.core.dex.nodes.FieldNode;
 import jadx.core.dex.nodes.InsnNode;
 import jadx.core.dex.nodes.MethodNode;
 import jadx.core.dex.nodes.RootNode;
+import jadx.core.utils.ErrorsCounter;
 import jadx.core.utils.RegionUtils;
-import jadx.core.utils.StringUtils;
 import jadx.core.utils.exceptions.CodegenException;
 import jadx.core.utils.exceptions.JadxRuntimeException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static jadx.core.utils.android.AndroidResourcesUtils.handleAppResField;
 
 public class InsnGen {
 	private static final Logger LOG = LoggerFactory.getLogger(InsnGen.class);
@@ -80,9 +80,9 @@ public class InsnGen {
 	}
 
 	public void addArgDot(CodeWriter code, InsnArg arg) throws CodegenException {
-		int len = code.length();
+		int len = code.bufLength();
 		addArg(code, arg, true);
-		if (len != code.length()) {
+		if (len != code.bufLength()) {
 			code.add('.');
 		}
 	}
@@ -131,8 +131,8 @@ public class InsnGen {
 		code.add(mgen.getNameGen().assignArg(arg));
 	}
 
-	private static String lit(LiteralArg arg) {
-		return TypeGen.literalToString(arg.getLiteral(), arg.getType());
+	private String lit(LiteralArg arg) {
+		return TypeGen.literalToString(arg.getLiteral(), arg.getType(), mth);
 	}
 
 	private void instanceField(CodeWriter code, FieldInfo field, InsnArg arg) throws CodegenException {
@@ -171,12 +171,7 @@ public class InsnGen {
 		boolean fieldFromThisClass = clsGen.getClassNode().getClassInfo().equals(declClass);
 		if (!fieldFromThisClass) {
 			// Android specific resources class handler
-			ClassInfo parentClass = declClass.getParentClass();
-			if (parentClass != null && parentClass.getShortName().equals("R")) {
-				clsGen.useClass(code, parentClass);
-				code.add('.');
-				code.add(declClass.getAlias().getShortName());
-			} else {
+			if (!handleAppResField(code, clsGen, declClass)) {
 				clsGen.useClass(code, declClass);
 			}
 			code.add('.');
@@ -237,7 +232,7 @@ public class InsnGen {
 		switch (insn.getType()) {
 			case CONST_STR:
 				String str = ((ConstStringNode) insn).getString();
-				code.add(StringUtils.unescapeString(str));
+				code.add(mth.dex().root().getStringUtils().unescapeString(str));
 				break;
 
 			case CONST_CLASS:
@@ -451,7 +446,7 @@ public class InsnGen {
 
 			/* fallback mode instructions */
 			case IF:
-				assert isFallback() : "if insn in not fallback mode";
+				fallbackOnlyInsn(insn);
 				IfNode ifInsn = (IfNode) insn;
 				code.add("if (");
 				addArg(code, insn.getArg(0));
@@ -462,17 +457,17 @@ public class InsnGen {
 				break;
 
 			case GOTO:
-				assert isFallback();
+				fallbackOnlyInsn(insn);
 				code.add("goto ").add(MethodGen.getLabelName(((GotoNode) insn).getTarget()));
 				break;
 
 			case MOVE_EXCEPTION:
-				assert isFallback();
+				fallbackOnlyInsn(insn);
 				code.add("move-exception");
 				break;
 
 			case SWITCH:
-				assert isFallback();
+				fallbackOnlyInsn(insn);
 				SwitchNode sw = (SwitchNode) insn;
 				code.add("switch(");
 				addArg(code, insn.getArg(0));
@@ -490,7 +485,7 @@ public class InsnGen {
 				break;
 
 			case FILL_ARRAY:
-				assert isFallback();
+				fallbackOnlyInsn(insn);
 				FillArrayNode arrayNode = (FillArrayNode) insn;
 				Object data = arrayNode.getData();
 				String arrStr;
@@ -510,12 +505,29 @@ public class InsnGen {
 
 			case NEW_INSTANCE:
 				// only fallback - make new instance in constructor invoke
-				assert isFallback();
-				code.add("new " + insn.getResult().getType());
+				fallbackOnlyInsn(insn);
+				code.add("new ").add(insn.getResult().getType().toString());
+				break;
+
+			case PHI:
+			case MERGE:
+				fallbackOnlyInsn(insn);
+				code.add(insn.getType().toString()).add("(");
+				for (InsnArg insnArg : insn.getArguments()) {
+					addArg(code, insnArg);
+					code.add(' ');
+				}
+				code.add(")");
 				break;
 
 			default:
 				throw new CodegenException(mth, "Unknown instruction: " + insn.getType());
+		}
+	}
+
+	private void fallbackOnlyInsn(InsnNode insn) throws CodegenException {
+		if (!fallback) {
+			throw new CodegenException(insn.getType() + " can be used only in fallback mode");
 		}
 	}
 
@@ -557,6 +569,11 @@ public class InsnGen {
 
 	private void inlineAnonymousConstr(CodeWriter code, ClassNode cls, ConstructorInsn insn) throws CodegenException {
 		// anonymous class construction
+		if (cls.contains(AFlag.DONT_GENERATE)) {
+			code.add("/* anonymous class already generated */");
+			ErrorsCounter.methodError(mth, "Anonymous class already generated: " + cls);
+			return;
+		}
 		ArgType parent;
 		if (cls.getInterfaces().size() == 1) {
 			parent = cls.getInterfaces().get(0);
@@ -734,9 +751,9 @@ public class InsnGen {
 				regs[callArg.getRegNum()] = arg;
 			}
 			// replace args
+			InsnNode inlCopy = inl.copy();
 			List<RegisterArg> inlArgs = new ArrayList<RegisterArg>();
-			inl.getRegisterArgs(inlArgs);
-			Map<RegisterArg, InsnArg> toRevert = new HashMap<RegisterArg, InsnArg>();
+			inlCopy.getRegisterArgs(inlArgs);
 			for (RegisterArg r : inlArgs) {
 				int regNum = r.getRegNum();
 				if (regNum >= regs.length) {
@@ -746,16 +763,11 @@ public class InsnGen {
 					if (repl == null) {
 						LOG.warn("Not passed register {} in method call: {} from {}", r, callMthNode, mth);
 					} else {
-						inl.replaceArg(r, repl);
-						toRevert.put(r, repl);
+						inlCopy.replaceArg(r, repl);
 					}
 				}
 			}
-			makeInsn(inl, code, Flags.BODY_ONLY);
-			// revert changes in 'MethodInlineAttr'
-			for (Map.Entry<RegisterArg, InsnArg> e : toRevert.entrySet()) {
-				inl.replaceArg(e.getValue(), e.getKey());
-			}
+			makeInsn(inlCopy, code, Flags.BODY_ONLY);
 		}
 		return true;
 	}
